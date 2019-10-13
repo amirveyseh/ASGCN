@@ -137,7 +137,7 @@ class Instructor:
         max_test_f1_avg = 0
         for i in range(repeats):
             print('repeat: ', (i+1))
-            f_out.write('repeat: '+str(i+1))
+            f_out.write('\n\rrepeat: '+str(i+1)+" ")
             self._reset_params()
             max_test_acc, max_test_f1 = self._train(criterion, optimizer)
             print('max_test_acc: {0}     max_test_f1: {1}'.format(max_test_acc, max_test_f1))
@@ -147,6 +147,8 @@ class Instructor:
             print('#' * 100)
         print("max_test_acc_avg:", max_test_acc_avg / repeats)
         print("max_test_f1_avg:", max_test_f1_avg / repeats)
+        f_out.write("max_test_acc_avg:", max_test_acc_avg / repeats)
+        f_out.write("max_test_f1_avg:", max_test_f1_avg / repeats)
 
         f_out.close()
 
