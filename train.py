@@ -88,7 +88,7 @@ class Instructor:
                         max_test_f1 = test_f1
                         if self.opt.save and test_f1 > self.global_f1:
                             self.global_f1 = test_f1
-                            torch.save(self.model.state_dict(), 'state_dict/'+self.opt.model_name+'_'+self.opt.dataset+'.pkl')
+                            torch.save(self.model.state_dict(), 'state_dict/'+self.opt.model_name+'_'+self.opt.dataset+'_'+self.opt.save_name+'.pkl')
                             print('>>> best model saved.')
                     print('loss: {:.4f}, acc: {:.4f}, test_acc: {:.4f}, test_f1: {:.4f}'.format(loss.item(), train_acc, test_acc, test_f1))
             if increase_flag == False:
@@ -131,7 +131,7 @@ class Instructor:
         _params = filter(lambda p: p.requires_grad, self.model.parameters())
         optimizer = self.opt.optimizer(_params, lr=self.opt.learning_rate, weight_decay=self.opt.l2reg)
 
-        f_out = open('log/'+self.opt.model_name+'_'+self.opt.dataset+'_val.txt', 'w', encoding='utf-8')
+        f_out = open('log/'+self.opt.model_name+'_'+self.opt.dataset+'_'+self.opt.save_name+'_val.txt', 'w', encoding='utf-8')
 
         max_test_acc_avg = 0
         max_test_f1_avg = 0
@@ -155,6 +155,7 @@ if __name__ == '__main__':
     # Hyper Parameters
     parser = argparse.ArgumentParser()
     parser.add_argument('--model_name', default='lstm', type=str)
+    parser.add_argument('--save_name', default='name', type=str)
     parser.add_argument('--dataset', default='twitter', type=str, help='twitter, rest14, lap14, rest15, rest16')
     parser.add_argument('--optimizer', default='adam', type=str)
     parser.add_argument('--initializer', default='xavier_uniform_', type=str)
