@@ -147,8 +147,8 @@ class Instructor:
             print('#' * 100)
         print("max_test_acc_avg:", max_test_acc_avg / repeats)
         print("max_test_f1_avg:", max_test_f1_avg / repeats)
-        f_out.write("max_test_acc_avg:", max_test_acc_avg / repeats)
-        f_out.write("max_test_f1_avg:", max_test_f1_avg / repeats)
+        f_out.write("max_test_acc_avg: " + max_test_acc_avg / repeats)
+        f_out.write("max_test_f1_avg: " + max_test_f1_avg / repeats)
 
         f_out.close()
 
