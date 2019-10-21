@@ -56,16 +56,38 @@ class ASGCN(nn.Module):
         text = self.text_embed_dropout(text)
         text_out, (_, _) = self.text_lstm(text, text_len)
         mask = self.get_mask(text_out, aspect_double_idx)
-        aspect = torch.max(text_out.masked_fill(mask, -INFINITY_NUMBER), 1)[0]
-        mask = self.get_mask(text_out, aspect_double_idx, reverse=True)
         sent = torch.max(text_out.masked_fill(mask, -INFINITY_NUMBER), 1)[0]
+        mask = self.get_mask(text_out, aspect_double_idx, reverse=True)
+        aspect = torch.max(text_out.masked_fill(mask, -INFINITY_NUMBER), 1)[0]
         output = self.fc(torch.cat([aspect, sent], dim=1))
+
+
+        gate1 = self.gate1(aspect).repeat(1, text_out.shape[1]).view(text_out.shape)
+        # gate2 = self.gate2(aspect).repeat(1, text_out.shape[1]).view(text_out.shape)
+        
         return output
 
-        # x, (_, _) = self.gcn_lstm(text_out, text_len)
-        # x = self.mask(x, aspect_double_idx)
-        # alpha_mat = torch.matmul(x, text_out.transpose(1, 2))
-        # alpha = F.softmax(alpha_mat.sum(1, keepdim=True), dim=2)
-        # x = torch.matmul(alpha, text_out).squeeze(1) # batch_size x 2*hidden_dim
-        # output = self.fc(x)
-        # return output
+
+
+        # target = torch.max(text_out.masked_fill(mask.byte(), -INFINITY_NUMBER), 1)[0]
+        # gate1 = self.gate1(target).repeat(1, text_out.shape[1]).view(text_out.shape)
+        # gate2 = self.gate2(target).repeat(1, text_out.shape[1]).view(text_out.shape)
+        # gcn1 = self.gc1(text_out, adj)
+        # x = gcn1 * gate1
+        # y = gcn1 * gate2
+        # x1 = torch.max(x.masked_fill(text_mask.byte(), -INFINITY_NUMBER), 1)[0]
+        # y1 = torch.max(y.masked_fill(text_mask.byte(), -INFINITY_NUMBER), 1)[0]
+        # sf1 = nn.Softmax(1)
+        # xy = (sf1(x1)*sf1(y1)).sum(1).mean()
+        # x = self.gc2(x, adj) * gate2
+        # x_sent = torch.max(x.masked_fill(text_mask.byte(), -INFINITY_NUMBER), 1)[0]
+        # output = self.fc(torch.cat([x_sent, target], dim=1))
+        # output_w = self.fc(torch.cat([x, target.repeat(1,x.shape[1]).view(x.shape)], dim=2))
+        # sf2 = nn.Softmax(2)
+        # output_p = sf2(output.repeat(1,text_indices.shape[1]).view(text_indices.shape[0], text_indices.shape[1], -1))
+        # output_w_p = sf2(output_w)
+        # scores = (output_p * torch.log(output_p/output_w_p+EPSILON)).sum(2)
+        # scores_p = sf1(scores)
+        # dist_to_target_p = sf1(dist_to_target.float())
+        # kl = (dist_to_target_p * torch.log(dist_to_target_p / scores_p + EPSILON)).sum(1).mean()
+        # return output, xy, kl
