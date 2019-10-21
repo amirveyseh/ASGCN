@@ -18,6 +18,11 @@ class ASGCN(nn.Module):
         self.fc = nn.Linear(2*2*opt.hidden_dim, opt.polarities_dim)
         self.text_embed_dropout = nn.Dropout(0.3)
 
+        self.gate1 = nn.Sequential(nn.Linear(opt.hidden_dim*2, opt.hidden_dim*2), nn.Tanh(),
+                                   nn.Linear(opt.hidden_dim * 2, opt.hidden_dim * 2), nn.Sigmoid())
+        self.gate2 = nn.Sequential(nn.Linear(opt.hidden_dim*2, opt.hidden_dim*2), nn.Tanh(),
+                                   nn.Linear(opt.hidden_dim * 2, opt.hidden_dim * 2), nn.Sigmoid())
+
     def get_mask(self, x, aspect_double_idx, reverse=False):
         batch_size, seq_len = x.shape[0], x.shape[1]
         aspect_double_idx = aspect_double_idx.cpu().numpy()
