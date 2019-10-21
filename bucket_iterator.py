@@ -35,7 +35,7 @@ class BucketIterator(object):
         for item in batch_data:
             text_indices, context_indices, aspect_indices, left_indices, polarity, dependency_graph = \
                 item['text_indices'], item['context_indices'], item['aspect_indices'], item['left_indices'],\
-                item['polarity'], item['dependency_graph']
+                item['polarity'], item['dependency_graph'], item['distance_to_target']
             text_padding = [0] * (max_len - len(text_indices))
             context_padding = [0] * (max_len - len(context_indices))
             aspect_padding = [0] * (max_len - len(aspect_indices))
@@ -53,7 +53,8 @@ class BucketIterator(object):
                 'aspect_indices': torch.tensor(batch_aspect_indices), \
                 'left_indices': torch.tensor(batch_left_indices), \
                 'polarity': torch.tensor(batch_polarity), \
-                'dependency_graph': torch.tensor(batch_dependency_graph)
+                'dependency_graph': torch.tensor(batch_dependency_graph), \
+                'distance_to_target': 
             }
 
     def __iter__(self):

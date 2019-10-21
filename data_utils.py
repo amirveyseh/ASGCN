@@ -110,6 +110,10 @@ class ABSADatesetReader:
         idx2gragh = pickle.load(fin)
         fin.close()
 
+        # idx2dist = {}
+        fin = open(fname+'.dist', 'rb')
+        idx2dist = pickle.load(fin)
+        fin.close()
 
         all_data = []
         for i in range(0, len(lines), 3):
@@ -124,6 +128,12 @@ class ABSADatesetReader:
             polarity = int(polarity)+1
             dependency_graph = idx2gragh[i]
 
+            # target = (len(left_indices), len(left_indices)+len(aspect_indices))
+            # dist_to_target = get_dist_to_target(dependency_graph, target, [-1]*len(dependency_graph))
+            # idx2dist[i] = dist_to_target
+
+            dist_to_target = idx2dist[i]
+
             data = {
                 'text_indices': text_indices,
                 'context_indices': context_indices,
@@ -131,6 +141,7 @@ class ABSADatesetReader:
                 'left_indices': left_indices,
                 'polarity': polarity,
                 'dependency_graph': dependency_graph,
+                'distance_to_target': dist_to_target
             }
 
             all_data.append(data)

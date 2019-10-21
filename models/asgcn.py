@@ -7,6 +7,7 @@ import torch.nn.functional as F
 from layers.dynamic_rnn import DynamicLSTM
 
 INFINITY_NUMBER = 1e12
+EPSILON = 1e-12
 
 class GraphConvolution(nn.Module):
     """
@@ -72,7 +73,7 @@ class ASGCN(nn.Module):
         return mask.byte()
 
     def forward(self, inputs):
-        text_indices, aspect_indices, left_indices, adj = inputs
+        text_indices, aspect_indices, left_indices, adj, dist_to_target = inputs
         text_len = torch.sum(text_indices != 0, dim=-1)
         text_mask = (text_indices == 0).unsqueeze(2)
         aspect_len = torch.sum(aspect_indices != 0, dim=-1)
@@ -111,7 +112,7 @@ class ASGCN(nn.Module):
         dist_to_target_p = sf1(dist_to_target.float())
         kl = (dist_to_target_p * torch.log(dist_to_target_p / scores_p + EPSILON)).sum(1).mean()
 
-        return output, xy
+        return output, xy, kl
 
 
 

@@ -74,9 +74,9 @@ class Instructor:
                 inputs = [sample_batched[col].to(self.opt.device) for col in self.opt.inputs_cols]
                 targets = sample_batched['polarity'].to(self.opt.device)
 
-                outputs, gate = self.model(inputs)
+                outputs, gate, kl = self.model(inputs)
                 loss = criterion(outputs, targets)
-                loss += self.opt.gate_loss * gate
+                loss += self.opt.gate_loss * gate + self.opt.kl_loss * kl
                 loss.backward()
                 optimizer.step()
 
@@ -95,7 +95,7 @@ class Instructor:
                             self.global_f1 = test_f1
                             torch.save(self.model.state_dict(), 'state_dict/'+self.opt.model_name+'_'+self.opt.dataset+'_'+self.opt.save_name+'.pkl')
                             print('>>> best model saved.')
-                    log_str = 'loss: {:.4f}, gate_loss: {:.4f}, acc: {:.4f}, test_acc: {:.4f}, test_f1: {:.4f}'.format(loss.item(), gate.item(), train_acc, test_acc, test_f1)
+                    log_str = 'loss: {:.4f}, gate_loss: {:.4f}, kl_loss: {:.4f}, acc: {:.4f}, test_acc: {:.4f}, test_f1: {:.4f}'.format(loss.item(), gate.item(), kl.item(), train_acc, test_acc, test_f1)
                     print(log_str)
                     f_out.write(log_str+'\n')
             if increase_flag == False:
@@ -117,7 +117,7 @@ class Instructor:
             for t_batch, t_sample_batched in enumerate(self.test_data_loader):
                 t_inputs = [t_sample_batched[col].to(opt.device) for col in self.opt.inputs_cols]
                 t_targets = t_sample_batched['polarity'].to(opt.device)
-                t_outputs, _ = self.model(t_inputs)
+                t_outputs, _, _ = self.model(t_inputs)
 
                 n_test_correct += (torch.argmax(t_outputs, -1) == t_targets).sum().item()
                 n_test_total += len(t_outputs)
@@ -192,8 +192,8 @@ if __name__ == '__main__':
     input_colses = {
         'lstm': ['text_indices'],
         'ascnn': ['text_indices', 'aspect_indices', 'left_indices'],
-        'asgcn': ['text_indices', 'aspect_indices', 'left_indices', 'dependency_graph'],
-        'astcn': ['text_indices', 'aspect_indices', 'left_indices', 'dependency_graph'],
+        'asgcn': ['text_indices', 'aspect_indices', 'left_indices', 'dependency_graph', 'distance_to_target'],
+        'astcn': ['text_indices', 'aspect_indices', 'left_indices', 'dependency_graph', 'distance_to_target'],
     }
     initializers = {
         'xavier_uniform_': torch.nn.init.xavier_uniform_,
