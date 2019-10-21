@@ -3,6 +3,9 @@
 import os
 import pickle
 import numpy as np
+from tqdm import tqdm
+
+INFINITY_NUMBER = 1e12
 
 def load_word_vec(path, word2idx=None):
     fin = open(path, 'r', encoding='utf-8', newline='\n', errors='ignore')
@@ -110,13 +113,13 @@ class ABSADatesetReader:
         idx2gragh = pickle.load(fin)
         fin.close()
 
-        # idx2dist = {}
-        fin = open(fname+'.dist', 'rb')
-        idx2dist = pickle.load(fin)
-        fin.close()
+        idx2dist = {}
+        # fin = open(fname+'.dist', 'rb')
+        # idx2dist = pickle.load(fin)
+        # fin.close()
 
         all_data = []
-        for i in range(0, len(lines), 3):
+        for i in tqdm(range(0, len(lines), 3)):
             text_left, _, text_right = [s.lower().strip() for s in lines[i].partition("$T$")]
             aspect = lines[i + 1].lower().strip()
             polarity = lines[i + 2].strip()
@@ -128,11 +131,11 @@ class ABSADatesetReader:
             polarity = int(polarity)+1
             dependency_graph = idx2gragh[i]
 
-            # target = (len(left_indices), len(left_indices)+len(aspect_indices))
-            # dist_to_target = get_dist_to_target(dependency_graph, target, [-1]*len(dependency_graph))
-            # idx2dist[i] = dist_to_target
+            target = (len(left_indices), len(left_indices)+len(aspect_indices))
+            dist_to_target = get_dist_to_target(dependency_graph, target, [-1]*len(dependency_graph))
+            idx2dist[i] = dist_to_target
 
-            dist_to_target = idx2dist[i]
+            # dist_to_target = idx2dist[i]
 
             data = {
                 'text_indices': text_indices,
@@ -145,6 +148,8 @@ class ABSADatesetReader:
             }
 
             all_data.append(data)
+        with open(fname+'.dist', 'wb') as file:
+            pickle.dump(idx2dist, file)
         return all_data
 
     def __init__(self, dataset='twitter', embed_dim=300):
@@ -186,4 +191,27 @@ class ABSADatesetReader:
         self.embedding_matrix = build_embedding_matrix(tokenizer.word2idx, embed_dim, dataset)
         self.train_data = ABSADataset(ABSADatesetReader.__read_data__(fname[dataset]['train'], tokenizer))
         self.test_data = ABSADataset(ABSADatesetReader.__read_data__(fname[dataset]['test'], tokenizer))
-    
+
+def get_dist(i, target, adj, seen):
+    seen.append(i)
+    if i in target:
+        return 0
+    else:
+        children = []
+        for j in range(len(adj)):
+            if adj[i][j] == 1 and i != j and j not in seen:
+                children.append(j)
+        md = INFINITY_NUMBER
+        for c in children:
+            d = get_dist(c, target, adj, seen) + 1
+            if d < md:
+                md = d
+        return md
+
+def get_dist_to_target(adj, target, dist):
+    target = list(range(target[0], target[1]))
+    for i in range(len(adj)):
+        dist[i] = get_dist(i, target, adj, [])
+    assert all(d != -1 for d in dist), dist
+    return [d+1 for d in dist]
+
