@@ -55,6 +55,10 @@ class Instructor:
         max_test_f1 = 0
         global_step = 0
         continue_not_increase = 0
+
+        f_out = open('log/detail/' + self.opt.model_name + '_' + self.opt.dataset + '_' + self.opt.save_name + '_val.txt', 'w',
+                     encoding='utf-8')
+
         for epoch in range(self.opt.num_epoch):
             print('>' * 100)
             print('epoch: ', epoch)
@@ -70,8 +74,9 @@ class Instructor:
                 inputs = [sample_batched[col].to(self.opt.device) for col in self.opt.inputs_cols]
                 targets = sample_batched['polarity'].to(self.opt.device)
 
-                outputs = self.model(inputs)
+                outputs, gate = self.model(inputs)
                 loss = criterion(outputs, targets)
+                loss += self.opt.gate_loss * gate
                 loss.backward()
                 optimizer.step()
 
@@ -90,14 +95,17 @@ class Instructor:
                             self.global_f1 = test_f1
                             torch.save(self.model.state_dict(), 'state_dict/'+self.opt.model_name+'_'+self.opt.dataset+'_'+self.opt.save_name+'.pkl')
                             print('>>> best model saved.')
-                    print('loss: {:.4f}, acc: {:.4f}, test_acc: {:.4f}, test_f1: {:.4f}'.format(loss.item(), train_acc, test_acc, test_f1))
+                    log_str = 'loss: {:.4f}, gate_loss: {:.4f}, acc: {:.4f}, test_acc: {:.4f}, test_f1: {:.4f}'.format(loss.item(), gate.item(), train_acc, test_acc, test_f1)
+                    print(log_str)
+                    f_out.write(log_str+'\n')
             if increase_flag == False:
                 continue_not_increase += 1
                 if continue_not_increase >= 5:
                     print('early stop.')
                     break
             else:
-                continue_not_increase = 0    
+                continue_not_increase = 0
+        f_out.close()
         return max_test_acc, max_test_f1
 
     def _evaluate_acc_f1(self):
@@ -109,7 +117,7 @@ class Instructor:
             for t_batch, t_sample_batched in enumerate(self.test_data_loader):
                 t_inputs = [t_sample_batched[col].to(opt.device) for col in self.opt.inputs_cols]
                 t_targets = t_sample_batched['polarity'].to(opt.device)
-                t_outputs = self.model(t_inputs)
+                t_outputs, _ = self.model(t_inputs)
 
                 n_test_correct += (torch.argmax(t_outputs, -1) == t_targets).sum().item()
                 n_test_total += len(t_outputs)
@@ -147,8 +155,8 @@ class Instructor:
             print('#' * 100)
         print("max_test_acc_avg:", max_test_acc_avg / repeats)
         print("max_test_f1_avg:", max_test_f1_avg / repeats)
-        f_out.write("max_test_acc_avg: " + max_test_acc_avg / repeats)
-        f_out.write("max_test_f1_avg: " + max_test_f1_avg / repeats)
+        f_out.write("max_test_acc_avg: " + str(max_test_acc_avg / repeats))
+        f_out.write("max_test_f1_avg: " + str(max_test_f1_avg / repeats))
 
         f_out.close()
 
@@ -172,6 +180,7 @@ if __name__ == '__main__':
     parser.add_argument('--save', default=False, type=bool)
     parser.add_argument('--seed', default=776, type=int)
     parser.add_argument('--device', default=None, type=str)
+    parser.add_argument('--gate_loss', default=1.0, type=float)
     opt = parser.parse_args()
 
     model_classes = {
