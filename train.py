@@ -180,7 +180,8 @@ if __name__ == '__main__':
     parser.add_argument('--save', default=False, type=bool)
     parser.add_argument('--seed', default=776, type=int)
     parser.add_argument('--device', default=None, type=str)
-    parser.add_argument('--gate_loss', default=1.0, type=float)
+    parser.add_argument('--gate_loss', default=100.0, type=float)
+    parser.add_argument('--kl_loss', default=10.0, type=float)
     opt = parser.parse_args()
 
     model_classes = {
