@@ -37,7 +37,7 @@ class ASGCN(nn.Module):
         super(ASGCN, self).__init__()
         self.opt = opt
         self.embed = nn.Embedding.from_pretrained(torch.tensor(embedding_matrix, dtype=torch.float))
-        self.text_lstm = DynamicLSTM(opt.embed_dim, opt.hidden_dim, num_layers=1, batch_first=True, bidirectional=True)
+        self.text_lstm = DynamicLSTM(opt.embed_dim+768, opt.hidden_dim, num_layers=1, batch_first=True, bidirectional=True)
         self.gcn_lstm = DynamicLSTM(2*opt.hidden_dim, opt.hidden_dim, num_layers=1, batch_first=True, bidirectional=True)
         self.fc = nn.Linear(2*2*opt.hidden_dim, opt.polarities_dim)
         self.text_embed_dropout = nn.Dropout(0.3)
@@ -73,13 +73,14 @@ class ASGCN(nn.Module):
         return mask.byte()
 
     def forward(self, inputs):
-        text_indices, aspect_indices, left_indices, adj, dist_to_target = inputs
+        text_indices, aspect_indices, left_indices, adj, dist_to_target, bert = inputs
         text_len = torch.sum(text_indices != 0, dim=-1)
         text_mask = (text_indices == 0).unsqueeze(2)
         aspect_len = torch.sum(aspect_indices != 0, dim=-1)
         left_len = torch.sum(left_indices != 0, dim=-1)
         aspect_double_idx = torch.cat([left_len.unsqueeze(1), (left_len+aspect_len-1).unsqueeze(1)], dim=1)
         text = self.embed(text_indices)
+        text = torch.cat([text, bert], dim=2)
         text = self.text_embed_dropout(text)
         text_out, (_, _) = self.text_lstm(text, text_len)
 

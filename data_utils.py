@@ -4,6 +4,8 @@ import os
 import pickle
 import numpy as np
 from tqdm import tqdm
+import json
+import random
 
 INFINITY_NUMBER = 1e12
 
@@ -76,6 +78,15 @@ class Tokenizer(object):
             sequence = [0]
         return sequence
 
+    def text_to_sequence2(self, text):
+        text = text.lower()
+        words = text.split()
+        unknownidx = 1
+        sequence = [w for w in words]
+        if len(sequence) == 0:
+            sequence = [0]
+        return sequence
+
 
 class ABSADataset(object):
     def __init__(self, data):
@@ -113,12 +124,17 @@ class ABSADatesetReader:
         idx2gragh = pickle.load(fin)
         fin.close()
 
-        idx2dist = {}
-        # fin = open(fname+'.dist', 'rb')
-        # idx2dist = pickle.load(fin)
-        # fin.close()
+        # idx2dist = {}
+        fin = open(fname+'.dist', 'rb')
+        idx2dist = pickle.load(fin)
+        fin.close()
+
+        with open(fname+'.bert') as file:
+            bert = json.load(file)
 
         all_data = []
+        j = 0
+        bad = 0
         for i in tqdm(range(0, len(lines), 3)):
             text_left, _, text_right = [s.lower().strip() for s in lines[i].partition("$T$")]
             aspect = lines[i + 1].lower().strip()
@@ -131,11 +147,13 @@ class ABSADatesetReader:
             polarity = int(polarity)+1
             dependency_graph = idx2gragh[i]
 
-            target = (len(left_indices), len(left_indices)+len(aspect_indices))
-            dist_to_target = get_dist_to_target(dependency_graph, target, [-1]*len(dependency_graph))
-            idx2dist[i] = dist_to_target
+            # target = (len(left_indices), len(left_indices)+len(aspect_indices))
+            # dist_to_target = get_dist_to_target(dependency_graph, target, [-1]*len(dependency_graph))
+            # idx2dist[i] = dist_to_target
 
-            # dist_to_target = idx2dist[i]
+            dist_to_target = idx2dist[i]
+
+            # assert (text_left + ' $T$ ' + text_right).lower().strip() == ' '.join(bert[j]['token']).lower().strip(), (text_left + ' $T$ ' + text_right).lower().strip() + ' !!!! ' + ' '.join(bert[j]['token']).lower().strip()
 
             data = {
                 'text_indices': text_indices,
@@ -144,10 +162,25 @@ class ABSADatesetReader:
                 'left_indices': left_indices,
                 'polarity': polarity,
                 'dependency_graph': dependency_graph,
-                'distance_to_target': dist_to_target
+                'distance_to_target': dist_to_target,
+                'bert': bert[j]['bert']
             }
 
+            if len(data['bert']) != len(data['text_indices']):
+                bad += 1
+                # print((text_left + ' $T$ ' + text_right).lower().strip())
+                # print(' '.join(bert[j]['token']).lower().strip())
+                # print(len(data['bert']))
+                # print(bert[j]['token'])
+                # print(len(data['text_indices']))
+                # print(tokenizer.text_to_sequence2(text_left + " " + aspect + " " + text_right))
+                # print(aspect)
+                # exit(1)
+
             all_data.append(data)
+
+            j += 1
+        print(bad/len(all_data))
         with open(fname+'.dist', 'wb') as file:
             pickle.dump(idx2dist, file)
         return all_data

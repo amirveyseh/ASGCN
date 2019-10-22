@@ -193,8 +193,8 @@ if __name__ == '__main__':
     input_colses = {
         'lstm': ['text_indices'],
         'ascnn': ['text_indices', 'aspect_indices', 'left_indices'],
-        'asgcn': ['text_indices', 'aspect_indices', 'left_indices', 'dependency_graph', 'distance_to_target'],
-        'astcn': ['text_indices', 'aspect_indices', 'left_indices', 'dependency_graph', 'distance_to_target'],
+        'asgcn': ['text_indices', 'aspect_indices', 'left_indices', 'dependency_graph', 'distance_to_target', 'bert'],
+        'astcn': ['text_indices', 'aspect_indices', 'left_indices', 'dependency_graph', 'distance_to_target', 'bert'],
     }
     initializers = {
         'xavier_uniform_': torch.nn.init.xavier_uniform_,
