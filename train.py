@@ -7,21 +7,30 @@ import random
 import numpy
 import torch
 import torch.nn as nn
-from bucket_iterator import BucketIterator
+from bucket_iterator import BucketIterator, BucketIterator_Bert
 from sklearn import metrics
-from data_utils import ABSADatesetReader
-from models import LSTM, ASCNN, ASGCN
+from data_utils import ABSADatesetReader, ABSADatesetReader_Bert
+from models import LSTM, ASCNN, ASGCN, ASGCN_BERT
+
 
 class Instructor:
     def __init__(self, opt):
         self.opt = opt
+        if opt.model_name != 'asgcn_bert':
+            absa_dataset = ABSADatesetReader(dataset=opt.dataset, embed_dim=opt.embed_dim)
 
-        absa_dataset = ABSADatesetReader(dataset=opt.dataset, embed_dim=opt.embed_dim)
-        
-        self.train_data_loader = BucketIterator(data=absa_dataset.train_data, batch_size=opt.batch_size, shuffle=True)
-        self.test_data_loader = BucketIterator(data=absa_dataset.test_data, batch_size=opt.batch_size, shuffle=False)
+            self.train_data_loader = BucketIterator(data=absa_dataset.train_data, batch_size=opt.batch_size, shuffle=True)
+            self.test_data_loader = BucketIterator(data=absa_dataset.test_data, batch_size=opt.batch_size, shuffle=False)
+            self.model = opt.model_class(absa_dataset.embedding_matrix, opt).to(opt.device)
+        else:
+            absa_dataset = ABSADatesetReader_Bert(dataset=opt.dataset, opt=opt)
+            self.train_data_loader = BucketIterator_Bert(data=absa_dataset.train_data, batch_size=opt.batch_size, shuffle=True)
+            self.test_data_loader = BucketIterator_Bert(data=absa_dataset.test_data, batch_size=opt.batch_size, shuffle=False)
+            self.model = opt.model_class(opt).to(opt.device)
+            for name, param in self.model.named_parameters():
+                if 'bert' in name:
+                    param.requires_grad = False
 
-        self.model = opt.model_class(absa_dataset.embedding_matrix, opt).to(opt.device)
         self._print_args()
         self.global_f1 = 0.
 
@@ -88,16 +97,18 @@ class Instructor:
                         max_test_f1 = test_f1
                         if self.opt.save and test_f1 > self.global_f1:
                             self.global_f1 = test_f1
-                            torch.save(self.model.state_dict(), 'state_dict/'+self.opt.model_name+'_'+self.opt.dataset+'.pkl')
+                            torch.save(self.model.state_dict(),
+                                       'state_dict/' + self.opt.model_name + '_' + self.opt.dataset + '.pkl')
                             print('>>> best model saved.')
-                    print('loss: {:.4f}, acc: {:.4f}, test_acc: {:.4f}, test_f1: {:.4f}'.format(loss.item(), train_acc, test_acc, test_f1))
+                    print('loss: {:.4f}, acc: {:.4f}, test_acc: {:.4f}, test_f1: {:.4f}'.format(loss.item(), train_acc,
+                                                                                                test_acc, test_f1))
             if increase_flag == False:
                 continue_not_increase += 1
                 if continue_not_increase >= 5:
                     print('early stop.')
                     break
             else:
-                continue_not_increase = 0    
+                continue_not_increase = 0
         return max_test_acc, max_test_f1
 
     def _evaluate_acc_f1(self):
@@ -122,7 +133,8 @@ class Instructor:
                     t_outputs_all = torch.cat((t_outputs_all, t_outputs), dim=0)
 
         test_acc = n_test_correct / n_test_total
-        f1 = metrics.f1_score(t_targets_all.cpu(), torch.argmax(t_outputs_all, -1).cpu(), labels=[0, 1, 2], average='macro')
+        f1 = metrics.f1_score(t_targets_all.cpu(), torch.argmax(t_outputs_all, -1).cpu(), labels=[0, 1, 2],
+                              average='macro')
         return test_acc, f1
 
     def run(self, repeats=3):
@@ -131,13 +143,16 @@ class Instructor:
         _params = filter(lambda p: p.requires_grad, self.model.parameters())
         optimizer = self.opt.optimizer(_params, lr=self.opt.learning_rate, weight_decay=self.opt.l2reg)
 
-        f_out = open('log/'+self.opt.model_name+'_'+self.opt.dataset+'_val.txt', 'w', encoding='utf-8')
+        if not os.path.exists('log/'):
+            os.mkdir('log/')
+
+        f_out = open('log/' + self.opt.model_name + '_' + self.opt.dataset + '_val_drop_rate_{}.txt'.format(self.opt.drop_rate), 'w', encoding='utf-8')
 
         max_test_acc_avg = 0
         max_test_f1_avg = 0
         for i in range(repeats):
-            print('repeat: ', (i+1))
-            f_out.write('repeat: '+str(i+1))
+            print('repeat: ', (i + 1))
+            f_out.write('repeat: ' + str(i + 1))
             self._reset_params()
             max_test_acc, max_test_f1 = self._train(criterion, optimizer)
             print('max_test_acc: {0}     max_test_f1: {1}'.format(max_test_acc, max_test_f1))
@@ -169,6 +184,9 @@ if __name__ == '__main__':
     parser.add_argument('--save', default=False, type=bool)
     parser.add_argument('--seed', default=776, type=int)
     parser.add_argument('--device', default=None, type=str)
+    parser.add_argument('--drop_rate', default=0.2, type=float)
+    parser.add_argument('--num_last_layer_bert', default=1, type=int)
+    parser.add_argument('--bert_version', default='bert-base-uncased', type=str)
     opt = parser.parse_args()
 
     model_classes = {
@@ -176,12 +194,14 @@ if __name__ == '__main__':
         'ascnn': ASCNN,
         'asgcn': ASGCN,
         'astcn': ASGCN,
+        'asgcn_bert': ASGCN_BERT
     }
     input_colses = {
         'lstm': ['text_indices'],
         'ascnn': ['text_indices', 'aspect_indices', 'left_indices'],
         'asgcn': ['text_indices', 'aspect_indices', 'left_indices', 'dependency_graph'],
         'astcn': ['text_indices', 'aspect_indices', 'left_indices', 'dependency_graph'],
+        'asgcn_bert': ['text_indices', 'aspect_indices', 'left_indices', 'dependency_graph', 'bert_in_indices', 'bert_out_indices']
     }
     initializers = {
         'xavier_uniform_': torch.nn.init.xavier_uniform_,

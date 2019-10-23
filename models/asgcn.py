@@ -80,12 +80,17 @@ class ASGCN(nn.Module):
         aspect_len = torch.sum(aspect_indices != 0, dim=-1)
         left_len = torch.sum(left_indices != 0, dim=-1)
         aspect_double_idx = torch.cat([left_len.unsqueeze(1), (left_len+aspect_len-1).unsqueeze(1)], dim=1)
-        text = self.embed(text_indices)
+        text = self.embed(text_indices) # [batch size, seq len, embed size]
         text = self.text_embed_dropout(text)
         text_out, (_, _) = self.text_lstm(text, text_len)
+        print('-' * 50)
+        print(text_out.shape)
+        print(text_out[0].shape)
+        
         x = F.relu(self.gc1(self.position_weight(text_out, aspect_double_idx, text_len, aspect_len), adj))
         x = F.relu(self.gc2(self.position_weight(x, aspect_double_idx, text_len, aspect_len), adj))
         x = self.mask(x, aspect_double_idx)
+        print(x.shape)
         alpha_mat = torch.matmul(x, text_out.transpose(1, 2))
         alpha = F.softmax(alpha_mat.sum(1, keepdim=True), dim=2)
         x = torch.matmul(alpha, text_out).squeeze(1) # batch_size x 2*hidden_dim
