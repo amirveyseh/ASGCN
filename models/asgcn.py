@@ -44,9 +44,11 @@ class ASGCN(nn.Module):
         self.gc1 = GraphConvolution(2*opt.hidden_dim, 2*opt.hidden_dim)
         self.gc2 = GraphConvolution(2*opt.hidden_dim, 2*opt.hidden_dim)
 
-        self.gate1 = nn.Sequential(nn.Linear(opt.hidden_dim*2, opt.hidden_dim*2), nn.Tanh(),
+        self.gate1 = nn.Sequential(nn.Linear(opt.hidden_dim*2, opt.hidden_dim*2), nn.Sigmoid(),
+                                   nn.Linear(opt.hidden_dim * 2, opt.hidden_dim * 2), nn.Sigmoid(),
                                    nn.Linear(opt.hidden_dim * 2, opt.hidden_dim * 2), nn.Sigmoid())
-        self.gate2 = nn.Sequential(nn.Linear(opt.hidden_dim*2, opt.hidden_dim*2), nn.Tanh(),
+        self.gate2 = nn.Sequential(nn.Linear(opt.hidden_dim*2, opt.hidden_dim*2), nn.Sigmoid(),
+                                   nn.Linear(opt.hidden_dim * 2, opt.hidden_dim * 2), nn.Sigmoid(),
                                    nn.Linear(opt.hidden_dim * 2, opt.hidden_dim * 2), nn.Sigmoid())
 
     def get_mask(self, x, aspect_double_idx, reverse=False):
@@ -94,7 +96,7 @@ class ASGCN(nn.Module):
         x1 = torch.max(x.masked_fill(text_mask.byte(), -INFINITY_NUMBER), 1)[0]
         y1 = torch.max(y.masked_fill(text_mask.byte(), -INFINITY_NUMBER), 1)[0]
         sf1 = nn.Softmax(1)
-        xy = (sf1(x1)*sf1(y1)).sum(1).mean()
+        xy = (x1*y1).sum(1).mean()
         gcn2 = self.gc2(x, adj)
         x = gcn2 * gate2
 
@@ -105,37 +107,15 @@ class ASGCN(nn.Module):
         output = self.fc(torch.cat([aspect, sent], dim=1))
 
         output_w = self.fc(torch.cat([x, aspect.repeat(1, x.shape[1]).view(x.shape)], dim=2))
+        scores = (output.repeat(1,text_indices.shape[1]).view(text_indices.shape[0], text_indices.shape[1], -1) * output_w).sum(2)
         sf2 = nn.Softmax(2)
-        output_p = sf2(output.repeat(1,text_indices.shape[1]).view(text_indices.shape[0], text_indices.shape[1], -1))
-        output_w_p = sf2(output_w)
-        scores = (output_p * torch.log(output_p/output_w_p+EPSILON)).sum(2)
-        scores_p = sf1(scores)
-        dist_to_target_p = sf1(dist_to_target.float())
-        kl = (dist_to_target_p * torch.log(dist_to_target_p / scores_p + EPSILON)).sum(1).mean()
-
-        return output, xy, kl
-
-
-
-        # target = torch.max(text_out.masked_fill(mask.byte(), -INFINITY_NUMBER), 1)[0]
-        # gate1 = self.gate1(target).repeat(1, text_out.shape[1]).view(text_out.shape)
-        # gate2 = self.gate2(target).repeat(1, text_out.shape[1]).view(text_out.shape)
-        # gcn1 = self.gc1(text_out, adj)
-        # x = gcn1 * gate1
-        # y = gcn1 * gate2
-        # x1 = torch.max(x.masked_fill(text_mask.byte(), -INFINITY_NUMBER), 1)[0]
-        # y1 = torch.max(y.masked_fill(text_mask.byte(), -INFINITY_NUMBER), 1)[0]
-        # sf1 = nn.Softmax(1)
-        # xy = (sf1(x1)*sf1(y1)).sum(1).mean()
-        # x = self.gc2(x, adj) * gate2
-        # x_sent = torch.max(x.masked_fill(text_mask.byte(), -INFINITY_NUMBER), 1)[0]
-        # output = self.fc(torch.cat([x_sent, target], dim=1))
-        # output_w = self.fc(torch.cat([x, target.repeat(1,x.shape[1]).view(x.shape)], dim=2))
-        # sf2 = nn.Softmax(2)
         # output_p = sf2(output.repeat(1,text_indices.shape[1]).view(text_indices.shape[0], text_indices.shape[1], -1))
         # output_w_p = sf2(output_w)
         # scores = (output_p * torch.log(output_p/output_w_p+EPSILON)).sum(2)
         # scores_p = sf1(scores)
         # dist_to_target_p = sf1(dist_to_target.float())
         # kl = (dist_to_target_p * torch.log(dist_to_target_p / scores_p + EPSILON)).sum(1).mean()
-        # return output, xy, kl
+
+        kl = (sf1(scores) * sf1(dist_to_target.float())).sum(1).mean()
+
+        return output, xy, kl
